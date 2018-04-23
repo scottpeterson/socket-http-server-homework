@@ -1,6 +1,7 @@
 import socket
 import sys
 import os
+import mimetypes
 
 def response_ok(body=b"This is a minimal response", mimetype=b"text/plain"):
     """
@@ -26,7 +27,7 @@ def response_ok(body=b"This is a minimal response", mimetype=b"text/plain"):
             ])
 
 def parse_request(request):
-    
+
     method, uri, version = request.split("\r\n")[0].split(" ")
 
     if method != "GET":
@@ -50,8 +51,11 @@ def response_not_found():
     # TODO: Construct and return a 404 "not found" response
     # You can re-use most of the code from the 405 Method Not
     # Allowed response.
-
-    pass
+    return b"\r\n".join([
+                b"HTTP/1.1 404 Not Found",
+                b"",
+                b"That page wasn't found on this server!",
+            ])
     
 
 def resolve_uri(uri):
@@ -83,14 +87,37 @@ def resolve_uri(uri):
     """
 
     # TODO: Fill content and mime_type according to the function description
-    # above. If the provided URI does not correspdond to a real file or
+    # above. If the provided URI does not correspond to a real file or
     # directory, then raise a NameError.
 
     # Hint: When opening a file, use open(filename, "rb") to open and read the
     # file as a stream of bytes.
-
     content = b"not implemented"
     mime_type = b"not implemented"
+    relative_uri = "webroot" + uri
+
+    if os.path.isdir(relative_uri):
+
+        mime_type = "text/plan".encode('utf8')
+        # have to do something to print out contents of directory
+        # I know how to ls from the command line, but not "here"
+        dir_contents = os.listdir(relative_uri)
+        str_dir_contents = " \n".join(dir_contents)
+        str_dir_contents = str_dir_contents.encode('utf8')
+        return str_dir_contents, mime_type
+
+
+    else:
+        mime_type = mimetypes.guess_type(uri)[0].encode('utf8')
+
+        # type_base, sub_type = mime_type.split("/")
+        # if type_base == "text":
+        with open(relative_uri, 'rb') as file:
+            content = file.read()
+
+        # else:
+        #     with open("webroot" + uri, 'r') as file:
+        #         content = file.read()
 
     return content, mime_type
 
@@ -114,8 +141,8 @@ def server(log_buffer=sys.stderr):
                     data = conn.recv(1024)
                     request += data.decode('utf8')
 
-                    #if len(data) < 1024:
-                    #    break
+                    if len(data) < 1024:
+                        break
                     if b'\r\n\r\n' in data:
                         break
 
@@ -128,9 +155,11 @@ def server(log_buffer=sys.stderr):
                     # specified by uri can't be found. If it does raise a
                     # NameError, then let response get response_not_found()
                     # instead of response_ok()
-                    body, mimetype = resolve_uri(uri)
-                    response = response_ok(body=body, mimetype=mimetype)
-
+                    try:
+                        body, mimetype = resolve_uri(uri)
+                        response = response_ok(body=body, mimetype=mimetype)
+                    except FileNotFoundError:
+                        response = response_not_found()
                 conn.sendall(response)
             finally:
                 conn.close()
@@ -143,5 +172,3 @@ def server(log_buffer=sys.stderr):
 if __name__ == '__main__':
     server()
     sys.exit(0)
-
-
